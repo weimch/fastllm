@@ -7,6 +7,7 @@
 #include "executor.h"
 
 #include "devices/cpu/cpudevice.h"
+#include "devices/npu/npudevice.h"
 
 #ifdef USE_CUDA
 #include "devices/cuda/cudadevice.h"
@@ -19,7 +20,7 @@ namespace fastllm {
 #ifdef USE_CUDA
         this->devices.push_back((BaseDevice*) new CudaDevice());
 #endif
-        this->devices.push_back((BaseDevice*) new CpuDevice());
+        this->devices.push_back((BaseDevice*) new NpuDevice());
     }
 
     Executor::~Executor() {

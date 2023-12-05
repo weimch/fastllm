@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.5)
 project(fastllm LANGUAGES CXX)
 
 option(USE_CUDA "use cuda" OFF)
+option(USE_NPU "use npu" OFF)
 
 option(PY_API "python api" OFF)
 option(USE_MMAP "use mmap" OFF)
@@ -10,6 +11,8 @@ option(USE_MMAP "use mmap" OFF)
 option(USE_SENTENCEPIECE "use sentencepiece" OFF)
 
 message(STATUS "USE_CUDA: ${USE_CUDA}")
+
+message(STATUS "USE_NPU: ${USE_NPU}")
 
 message(STATUS "PYTHON_API: ${PY_API}")
 
@@ -53,6 +56,15 @@ if (USE_CUDA)
     set(FASTLLM_CUDA_SOURCES src/devices/cuda/cudadevice.cpp src/devices/cuda/cudadevicebatch.cpp src/devices/cuda/fastllm-cuda.cu)
     set(FASTLLM_LINKED_LIBS ${FASTLLM_LINKED_LIBS} cublas)
     set(CMAKE_CUDA_ARCHITECTURES "native")
+endif()
+
+if (USE_NPU)
+    include_directories($ENV{ASCEND_TOOLKIT_HOME}/include)
+    # link_directories($ENV{ASCEND_TOOLKIT_HOME}/lib)
+    include_directories($ENV{ATB_HOME_PATH}/include)
+    link_directories($ENV{ATB_HOME_PATH}/lib)
+    set(FASTLLM_CUDA_SOURCES src/devices/npu/npudevice.cpp src/devices/npu/npudevicebatch.cpp)
+    set(FASTLLM_LINKED_LIBS ${FASTLLM_LINKED_LIBS} atb)
 endif()
 
 if (PY_API)
