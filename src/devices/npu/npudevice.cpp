@@ -154,7 +154,7 @@ aclDataType ToNpuDataType(fastllm::DataType datatype) {
 atb::Tensor ToNpuTensor(fastllm::Data data) {
     atb::Tensor tensor;
     tensor.hostData = data.cpuData;
-    tensor.dataSize = data.expansionSize;
+    tensor.dataSize = data.expansionBytes;
     tensor.desc.dtype = ToNpuDataType(data.dataType);
     AssertInFastLLM(data.dims.size() <= atb::MAX_DIM,
                     "Dims " + std::to_string(data.dims.size()) + " exceed MAX_DIM(8)");
@@ -162,7 +162,7 @@ atb::Tensor ToNpuTensor(fastllm::Data data) {
     for (int i = 0; i < data.dims.size(); ++i) {
         tensor.desc.shape.dims[i] = data.dims[i];
     }
-    tensor.desc.format = ACL_FORMAT_ND;
+    // tensor.desc.format = ACL_FORMAT_ND;
     return tensor;
 }
 }  // namespace
