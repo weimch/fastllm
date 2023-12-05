@@ -155,9 +155,8 @@ atb::Tensor ToNpuTensor(const fastllm::Data &data) {
     atb::Tensor tensor;
     tensor.hostData = data.cpuData;
     tensor.dataSize = data.GetBytes();
-    tensor.desc.dtype = ToNpuDataType(data.dataType);
-    std::cout << "handle datasize: " << tensor.dataSize << std::endl;
-    std::cout << "handle type: " << tensor.desc.dtype << std::endl;
+    // tensor.desc.dtype = ToNpuDataType(data.dataType);
+    tensor.desc.dtype = ACL_FLOAT16;
     AssertInFastLLM(data.dims.size() <= atb::MAX_DIM,
                     "Dims " + std::to_string(data.dims.size()) + " exceed MAX_DIM(8)");
     tensor.desc.shape.dimNum = data.dims.size();
@@ -649,6 +648,7 @@ void NpuRMSNormOp::Run(const std::string &opType, const fastllm::DataDict &datas
     atb::SVector<atb::Tensor> &in = data.inTensors;
     in.push_back(ToNpuTensor(input));   // x
     in.push_back(ToNpuTensor(weight));  // gamma(weight)
+    in.push_back(atb::Tensor());
     NpuTransfomerInvoke(op, data);
     output.cpuData = static_cast<uint8_t *>(data.outTensors[0].hostData);
 }
