@@ -153,7 +153,7 @@ aclDataType ToNpuDataType(fastllm::DataType datatype) {
 
 atb::Tensor ToNpuTensor(const fastllm::Data &data) {
     atb::Tensor tensor;
-    tensor.hostData = data.;
+    tensor.hostData = data.cpuData;
     tensor.dataSize = data.GetBytes();
     tensor.desc.dtype = ToNpuDataType(data.dataType);
     AssertInFastLLM(data.dims.size() <= atb::MAX_DIM,
