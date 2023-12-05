@@ -103,7 +103,7 @@ namespace {
 
 // 调用Npu可大模型加速单算子调用
 template <class T>
-void NpuBoostTransfomerParamInvoke(T &opParam, atb::VariantPack &variantPack) {
+void NpuTransfomerInvoke(T &opParam, atb::VariantPack &variantPack) {
     // 返回时清理相关资源
     struct ScopedCleanUp {
         ~ScopedCleanUp() {
@@ -133,22 +133,6 @@ void NpuBoostTransfomerParamInvoke(T &opParam, atb::VariantPack &variantPack) {
         "operation execute");
 }
 
-// atb::infer::QuantType ToNpuDataType(fastllm::DataType type) {
-//     // 当前仅支持INT8量化
-//     switch (type) {
-//         // case fastllm::DataType::FLOAT16:
-//         //     return atb::infer::QuantType::QUANT_FLOAT16;
-//         // case fastllm::DataType::INT16:
-//         //     return atb::infer::QuantType::QUANT_INT16;
-//         case fastllm::DataType::INT8:
-//             return atb::infer::QuantType::QUANT_INT8;
-//         // case fastllm::DataType::INT4:
-//         //     return atb::infer::QuantType::QUANT_INT4;
-//         default:
-//             return atb::infer::QuantType::QUANT_UNDEINFED;
-//     }
-// }
-
 aclDataType ToNpuDataType(fastllm::DataType datatype) {
     switch (datatype) {
         case fastllm::DataType::BFLOAT16:
@@ -170,7 +154,7 @@ aclDataType ToNpuDataType(fastllm::DataType datatype) {
 atb::Tensor ToNpuTensor(fastllm::Data data) {
     atb::Tensor tensor;
     tensor.hostData = data.cpuData;
-    tensor.dataSize = data.expansionBytes;
+    tensor.dataSize = data.expansionSize;
     tensor.desc.dtype = ToNpuDataType(data.dataType);
     AssertInFastLLM(data.dims.size() <= atb::MAX_DIM,
                     "Dims " + std::to_string(data.dims.size()) + " exceed MAX_DIM(8)");
@@ -663,7 +647,7 @@ void NpuRMSNormOp::Run(const std::string &opType, const fastllm::DataDict &datas
     atb::SVector<atb::Tensor> &in = data.inTensors;
     in.push_back(ToNpuTensor(input));   // x
     in.push_back(ToNpuTensor(weight));  // gamma(weight)
-    NpuBoostTransfomerParamInvoke(op, data);
+    NpuTransfomerInvoke(op, data);
     output.cpuData = static_cast<uint8_t *>(data.outTensors[0].hostData);
 }
 
