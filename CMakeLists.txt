@@ -60,11 +60,11 @@ endif()
 
 if (USE_NPU)
     include_directories($ENV{ASCEND_TOOLKIT_HOME}/include)
-    # link_directories($ENV{ASCEND_TOOLKIT_HOME}/lib)
+    link_directories($ENV{ASCEND_TOOLKIT_HOME}/lib64)
     include_directories($ENV{ATB_HOME_PATH}/include)
     link_directories($ENV{ATB_HOME_PATH}/lib)
     set(FASTLLM_CUDA_SOURCES src/devices/npu/npudevice.cpp src/devices/npu/npudevicebatch.cpp)
-    set(FASTLLM_LINKED_LIBS ${FASTLLM_LINKED_LIBS} atb)
+    set(FASTLLM_LINKED_LIBS ${FASTLLM_LINKED_LIBS} atb ascendcl)
 endif()
 
 if (PY_API)

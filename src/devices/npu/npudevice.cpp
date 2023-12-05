@@ -119,18 +119,67 @@ void NpuBoostTransfomerParamInvoke(T &opParam, atb::VariantPack &variantPack) {
         void *stream = nullptr;
     } res;
     // 构造算子对应的Operation
-    RETURN_IF_ATB_ERROR(atb::CreateOperation(opParam, &res->operation), "operation create");
+    RETURN_IF_ATB_ERROR(atb::CreateOperation(opParam, &res.operation), "operation create");
     // 分配Npu内存
     uint64_t workspaceSize = 0;
-    RETURN_IF_ATB_ERROR(res->operation->Setup(variantPack, workspaceSize), "operation setup");
-    RETURN_IF_ACL_ERROR(aclrtMalloc(&res->workspace, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST), "npu memory malloc");
+    RETURN_IF_ATB_ERROR(res.operation->Setup(variantPack, workspaceSize), "operation setup");
+    RETURN_IF_ACL_ERROR(aclrtMalloc(&res.workspace, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST), "npu memory malloc");
     // 执行算子
-    RETURN_IF_ATB_ERROR(atb::CreateContext(&res->context), "context create");
-    RETURN_IF_ACL_ERROR(aclrtCreateStream(&res->stream), "stream create");
-    RETURN_IF_ATB_ERROR(res->context->SetExecuteStream(res->stream), "stream set");
+    RETURN_IF_ATB_ERROR(atb::CreateContext(&res.context), "context create");
+    RETURN_IF_ACL_ERROR(aclrtCreateStream(&res.stream), "stream create");
+    RETURN_IF_ATB_ERROR(res.context->SetExecuteStream(res.stream), "stream set");
     RETURN_IF_ATB_ERROR(
-        res->operation->Execute(variantPack, static_cast<uint8_t *>(res->workspace), workspaceSize, res->context),
+        res.operation->Execute(variantPack, static_cast<uint8_t *>(res.workspace), workspaceSize, res.context),
         "operation execute");
+}
+
+// atb::infer::QuantType ToNpuDataType(fastllm::DataType type) {
+//     // 当前仅支持INT8量化
+//     switch (type) {
+//         // case fastllm::DataType::FLOAT16:
+//         //     return atb::infer::QuantType::QUANT_FLOAT16;
+//         // case fastllm::DataType::INT16:
+//         //     return atb::infer::QuantType::QUANT_INT16;
+//         case fastllm::DataType::INT8:
+//             return atb::infer::QuantType::QUANT_INT8;
+//         // case fastllm::DataType::INT4:
+//         //     return atb::infer::QuantType::QUANT_INT4;
+//         default:
+//             return atb::infer::QuantType::QUANT_UNDEINFED;
+//     }
+// }
+
+aclDataType ToNpuDataType(fastllm::DataType datatype) {
+    switch (datatype) {
+        case fastllm::DataType::BFLOAT16:
+            return ACL_BF16;
+        case fastllm::DataType::FLOAT16:
+            return ACL_FLOAT16;
+        case fastllm::DataType::FLOAT32:
+            return ACL_DOUBLE;
+        case fastllm::DataType::INT16:
+            return ACL_INT16;
+        case fastllm::DataType::INT8:
+            return ACL_INT8;
+        default:
+            ErrorInFastLLM("DataType " + std::to_string(datatype) + " not supported yet.");
+    }
+    return ACL_DT_UNDEFINED;
+}
+
+atb::Tensor ToNpuTensor(fastllm::Data data) {
+    atb::Tensor tensor;
+    tensor.hostData = data.cpuData;
+    tensor.dataSize = data.expansionBytes;
+    tensor.desc.dtype = ToNpuDataType(data.dataType);
+    AssertInFastLLM(data.dims.size() <= atb::MAX_DIM,
+                    "Dims " + std::to_string(data.dims.size()) + " exceed MAX_DIM(8)");
+    tensor.desc.shape.dimNum = data.dims.size();
+    for (int i = 0; i < data.dims.size(); ++i) {
+        tensor.desc.shape.dims[i] = data.dims[i];
+    }
+    tensor.desc.format = ACL_FORMAT_ND;
+    return tensor;
 }
 }  // namespace
 
@@ -607,71 +656,15 @@ void NpuRMSNormOp::Run(const std::string &opType, const fastllm::DataDict &datas
     int outer = input.Count(0) / input.Count(axis);
     int channels = input.dims[axis];
 
-    if (input.dataType == DataType::FLOAT32) {
-        float *inputData = (float *)input.cpuData;
-        float *outputData = (float *)output.cpuData;
-        float *weightData = (float *)weight.cpuData;
-
-        for (int i = 0; i < outer; i++) {
-            float mean = 0.f;
-            int j = 0;
-#ifdef __aarch64__X
-            float32x4_t sums = vdupq_n_f32(0.0);
-            float32x4_t sums2 = vdupq_n_f32(0.0);
-            for (; j + 3 < channels; j += 4) {
-                float32x4_t vi = vld1q_f32(inputData + j);
-                sums = vaddq_f32(sums, vi);
-                sums2 = vaddq_f32(sums2, vmulq_f32(vi, vi));
-            }
-            mean = sums[0] + sums[1] + sums[2] + sums[3];
-            s2 = sums2[0] + sums2[1] + sums2[2] + sums2[3];
-#endif
-            for (; j < channels; j++) {
-                mean += inputData[j] * inputData[j];
-            }
-            float scale = 1.0 / sqrt(mean / channels + eps);
-            j = 0;
-#ifdef __aarch64__X
-            float32x4_t means = vdupq_n_f32(mean);
-            float32x4_t vars = vdupq_n_f32(1.0 / var);
-            for (; j + 3 < channels; j += 4) {
-                float32x4_t va = vld1q_f32(gammaData + j), vb = vld1q_f32(betaData + j);
-                float32x4_t vi = vld1q_f32(inputData + j);
-                float32x4_t vo = vaddq_f32(vmulq_f32(vmulq_f32(vsubq_f32(vi, means), vars), va), vb);
-                vst1q_f32(outputData + j, vo);
-            }
-#endif
-            for (; j < channels; j++) {
-                outputData[j] = inputData[j] * scale * weightData[j];
-            }
-
-            inputData += channels;
-            outputData += channels;
-        }
-    } else if (input.dataType == DataType::FLOAT16) {
-        uint16_t *inputData = (uint16_t *)input.cpuData;
-        uint16_t *outputData = (uint16_t *)output.cpuData;
-        float *weightData = (float *)weight.cpuData;
-
-        for (int i = 0; i < outer; i++) {
-            float mean = 0.f;
-            int j = 0;
-            for (; j < channels; j++) {
-                float x = fp16tofp32.dict[inputData[j]];
-                mean += x * x;
-            }
-            float scale = 1.0 / sqrt(mean / channels + eps);
-            j = 0;
-            for (; j < channels; j++) {
-                outputData[j] = float_to_half(fp16tofp32.dict[inputData[j]] * scale * weightData[j]);
-            }
-
-            inputData += channels;
-            outputData += channels;
-        }
-    } else {
-        ErrorInFastLLM("RMSNorm error: unsupport dataType.\n");
-    }
+    atb::infer::RmsNormParam op;
+    op.layerType = atb::infer::RmsNormParam::RmsNormType::RMS_NORM_NORM;
+    op.normParam.epsilon = eps;
+    atb::VariantPack data;
+    atb::SVector<atb::Tensor> &in = data.inTensors;
+    in.push_back(ToNpuTensor(input));   // x
+    in.push_back(ToNpuTensor(weight));  // gamma(weight)
+    NpuBoostTransfomerParamInvoke(op, data);
+    output.cpuData = static_cast<uint8_t *>(data.outTensors[0].hostData);
 }
 
 void NpuLinearOp::Reshape(const std::string &opType, const fastllm::DataDict &datas,
