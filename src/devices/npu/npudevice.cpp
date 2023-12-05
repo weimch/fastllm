@@ -649,6 +649,7 @@ void NpuRMSNormOp::Run(const std::string &opType, const fastllm::DataDict &datas
     in.push_back(ToNpuTensor(input));   // x
     in.push_back(ToNpuTensor(weight));  // gamma(weight)
     in.push_back(atb::Tensor());
+    data.outTensors.push_back(atb::Tensor());
     NpuTransfomerInvoke(op, data);
     output.cpuData = static_cast<uint8_t *>(data.outTensors[0].hostData);
 }
