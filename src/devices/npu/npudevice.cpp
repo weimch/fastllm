@@ -151,7 +151,7 @@ aclDataType ToNpuDataType(fastllm::DataType datatype) {
     return ACL_DT_UNDEFINED;
 }
 
-atb::Tensor ToNpuTensor(fastllm::Data data) {
+atb::Tensor ToNpuTensor(const fastllm::Data &data) {
     atb::Tensor tensor;
     tensor.hostData = data.cpuData;
     tensor.dataSize = data.expansionBytes;
@@ -162,7 +162,7 @@ atb::Tensor ToNpuTensor(fastllm::Data data) {
     for (int i = 0; i < data.dims.size(); ++i) {
         tensor.desc.shape.dims[i] = data.dims[i];
     }
-    // tensor.desc.format = ACL_FORMAT_ND;
+    tensor.desc.format = ACL_FORMAT_ND;
     return tensor;
 }
 }  // namespace
