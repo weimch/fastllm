@@ -107,8 +107,8 @@ void NpuTransfomerInvoke(T &opParam, atb::VariantPack &variantPack) {
     // 返回时清理相关资源
     struct ScopedCleanUp {
         ~ScopedCleanUp() {
-            // if (operation) atb::DestroyOperation(operation);
-            // if (workspace) aclrtFree(workspace);
+            if (operation) atb::DestroyOperation(operation);
+            if (workspace) aclrtFree(workspace);
             if (context) atb::DestroyContext(context);
             if (stream) aclrtDestroyStream(stream);
         }
@@ -153,8 +153,8 @@ aclDataType ToNpuDataType(fastllm::DataType datatype) {
 
 atb::Tensor ToNpuTensor(const fastllm::Data &data) {
     atb::Tensor tensor;
-    tensor.hostData = data.cpuData;
-    tensor.dataSize = data.expansionBytes;
+    tensor.hostData = data.;
+    tensor.dataSize = data.GetBytes();
     tensor.desc.dtype = ToNpuDataType(data.dataType);
     AssertInFastLLM(data.dims.size() <= atb::MAX_DIM,
                     "Dims " + std::to_string(data.dims.size()) + " exceed MAX_DIM(8)");
