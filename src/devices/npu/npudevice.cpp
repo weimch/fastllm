@@ -156,6 +156,8 @@ atb::Tensor ToNpuTensor(const fastllm::Data &data) {
     tensor.hostData = data.cpuData;
     tensor.dataSize = data.GetBytes();
     tensor.desc.dtype = ToNpuDataType(data.dataType);
+    std::cout << "handle datasize: " << tensor.dataSize << std::endl;
+    std::cout << "handle type: " << tensor.desc.dtype << std::endl;
     AssertInFastLLM(data.dims.size() <= atb::MAX_DIM,
                     "Dims " + std::to_string(data.dims.size()) + " exceed MAX_DIM(8)");
     tensor.desc.shape.dimNum = data.dims.size();
