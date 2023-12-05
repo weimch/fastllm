@@ -107,8 +107,8 @@ void NpuTransfomerInvoke(T &opParam, atb::VariantPack &variantPack) {
     // 返回时清理相关资源
     struct ScopedCleanUp {
         ~ScopedCleanUp() {
-            if (operation) atb::DestroyOperation(operation);
-            if (workspace) aclrtFree(workspace);
+            // if (operation) atb::DestroyOperation(operation);
+            // if (workspace) aclrtFree(workspace);
             if (context) atb::DestroyContext(context);
             if (stream) aclrtDestroyStream(stream);
         }
