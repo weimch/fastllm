@@ -26,7 +26,9 @@
 namespace fastllm {
 
 NpuDevice::NpuDevice() {
-    this->deviceType = "npu";
+    this->deviceType = "cpu";
+
+    // 注册可执行算子
     this->ops["ToFloat16"] = (BaseOperator *)(new NpuToFloat16());
     this->ops["ToFloat32"] = (BaseOperator *)(new NpuToFloat32());
     this->ops["Attention"] = (BaseOperator *)(new NpuAttention());
@@ -66,6 +68,16 @@ NpuDevice::NpuDevice() {
     this->ops["SoftMaxBatch"] = (BaseOperator *)(new NpuSoftmaxBatchOp());
     this->ops["CatDirectBatch"] = (BaseOperator *)(new NpuCatDirectBatchOp());
     this->ops["AttentionBatch"] = (BaseOperator *)(new NpuAttentionBatchOp());
+
+    // 初始化AscendCL(Ascend Computing Language)运行时资源
+    fastllm::AssertInFastLLM(aclInit(nullptr) == ACL_SUCCESS, "ACL_ERROR: acl init failed");
+    fastllm::AssertInFastLLM(aclrtSetDevice(0) == ACL_SUCCESS, "ACL_ERROR: acl set device failed");
+}
+
+NpuDevice::~NpuDevice() {
+    // 释放AscendCL运行时资源
+    fastllm::AssertInFastLLM(aclFinalize() == ACL_SUCCESS, "ACL_ERROR: acl finalize failed");
+    fastllm::AssertInFastLLM(aclrtResetDevice(0) == ACL_SUCCESS, "ACL_ERROR: acl finalize failed");
 }
 
 bool NpuDevice::Malloc(void **ret, size_t size) {
@@ -115,11 +127,15 @@ void NpuTransfomerInvoke(T &opParam, atb::VariantPack &variantPack) {
 
         atb::Operation *operation = nullptr;
         void *workspace = nullptr;
-        atb::Context *context;
+        atb::Context *context = nullptr;
         void *stream = nullptr;
     } res;
     // 构造算子对应的Operation
     RETURN_IF_ATB_ERROR(atb::CreateOperation(opParam, &res.operation), "operation create");
+    std::cout << res.operation->GetName() << std::endl;
+    std::cout << "input tensor num: " << variantPack.inTensors.size() << std::endl;
+    std::cout << "op input num: " << res.operation->GetInputNum() << std::endl;
+    std::cout << "op output num: " << res.operation->GetOutputNum() << std::endl;
     // 分配Npu内存
     uint64_t workspaceSize = 0;
     RETURN_IF_ATB_ERROR(res.operation->Setup(variantPack, workspaceSize), "operation setup");
@@ -160,9 +176,12 @@ atb::Tensor ToNpuTensor(const fastllm::Data &data) {
     AssertInFastLLM(data.dims.size() <= atb::MAX_DIM,
                     "Dims " + std::to_string(data.dims.size()) + " exceed MAX_DIM(8)");
     tensor.desc.shape.dimNum = data.dims.size();
+    std::cout << "dims: ";
     for (int i = 0; i < data.dims.size(); ++i) {
         tensor.desc.shape.dims[i] = data.dims[i];
+        std::cout << tensor.desc.shape.dims[i] << ", ";
     }
+    std::cout << std::endl;
     tensor.desc.format = ACL_FORMAT_ND;
     return tensor;
 }
@@ -646,10 +665,11 @@ void NpuRMSNormOp::Run(const std::string &opType, const fastllm::DataDict &datas
     op.normParam.epsilon = eps;
     atb::VariantPack data;
     atb::SVector<atb::Tensor> &in = data.inTensors;
+    std::cout << "Invoke NpuRMSNormOp" << std::endl;
     in.push_back(ToNpuTensor(input));   // x
     in.push_back(ToNpuTensor(weight));  // gamma(weight)
-    in.push_back(atb::Tensor());
-    data.outTensors.push_back(atb::Tensor());
+    std::cout << "input tensor size: " << in.size() << std::endl;
+    // in.push_back(ToNpuTensor(weight));
     NpuTransfomerInvoke(op, data);
     output.cpuData = static_cast<uint8_t *>(data.outTensors[0].hostData);
 }

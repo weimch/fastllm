@@ -13,6 +13,7 @@ namespace fastllm {
 class NpuDevice : BaseDevice {
    public:
     NpuDevice();
+    ~NpuDevice() override;
 
     bool Malloc(void **ret, size_t size);  // 分配尺寸为size的空间
     bool Free(void *ret);                  // 释放ret
