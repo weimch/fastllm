@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.5)
 project(fastllm LANGUAGES CXX)
 
 option(USE_CUDA "use cuda" OFF)
+option(USE_NPU "use npu" OFF)
 
 option(PY_API "python api" OFF)
 option(USE_MMAP "use mmap" OFF)
@@ -10,6 +11,8 @@ option(USE_MMAP "use mmap" OFF)
 option(USE_SENTENCEPIECE "use sentencepiece" OFF)
 
 message(STATUS "USE_CUDA: ${USE_CUDA}")
+
+message(STATUS "USE_NPU: ${USE_NPU}")
 
 message(STATUS "PYTHON_API: ${PY_API}")
 
@@ -22,7 +25,7 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNOMINMAX -O2 /std:c++17 /arch:AVX /source-charset:utf-8")
 else()
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread --std=c++17 -O2 -march=native")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread --std=c++17 -g -march=native")
 endif()
 
 
@@ -53,6 +56,16 @@ if (USE_CUDA)
     set(FASTLLM_CUDA_SOURCES src/devices/cuda/cudadevice.cpp src/devices/cuda/cudadevicebatch.cpp src/devices/cuda/fastllm-cuda.cu)
     set(FASTLLM_LINKED_LIBS ${FASTLLM_LINKED_LIBS} cublas)
     set(CMAKE_CUDA_ARCHITECTURES "native")
+endif()
+
+if (USE_NPU)
+    find_package(Torch)
+    if(NOT Torch_FOUND)
+        message(STATUS "Torch not found")
+    endif()
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
+    set(FASTLLM_CUDA_SOURCES src/devices/npu/npudevice.cpp src/devices/npu/npudevicebatch.cpp)
+    set(FASTLLM_LINKED_LIBS ${FASTLLM_LINKED_LIBS} ${TORCH_LIBRARIES})
 endif()
 
 if (PY_API)

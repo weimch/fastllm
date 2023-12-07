@@ -175,7 +175,7 @@ namespace fastllm {
     };
 
     enum DataDevice {
-        CPU = 0, CUDA = 1
+        CPU = 0, CUDA = 1, NPU = 2
     };
 
     enum WeightType {
@@ -233,6 +233,9 @@ namespace fastllm {
 
 	    void *cudaData = nullptr;
         std::vector <void*> extraCudaData;
+
+        void *npuData = nullptr;
+        std::vector <void*> extraNpuData;
 
         void *deviceData = nullptr;
         std::vector <void*> extraDeviceData;
